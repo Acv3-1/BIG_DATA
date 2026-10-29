@@ -54,3 +54,29 @@ services:
       - "3"
       - --replication-factor
       - "1"
+
+  # Spark Structured Streaming: lee de Kafka, parsea, transforma y agrega por ventana.
+  # Usa el listener interno de Kafka (kafka:19092). La versión del paquete
+  # spark-sql-kafka debe coincidir con la de la imagen (3.5.3 / Scala 2.12).
+  spark:
+    image: apache/spark:3.5.3-python3
+    container_name: rapidgo-spark
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      KAFKA_BOOTSTRAP: kafka:19092
+      KAFKA_TOPIC: inventario-fulfillment
+      PYTHONPATH: /opt/app
+    volumes:
+      - ./spark:/opt/app/spark:ro
+      - ./datalake:/opt/app/datalake
+    command:
+      - /opt/spark/bin/spark-submit
+      - --master
+      - local[2]
+      - --conf
+      - spark.jars.ivy=/tmp/.ivy
+      - --packages
+      - org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3
+      - /opt/app/spark/streaming_job.py
