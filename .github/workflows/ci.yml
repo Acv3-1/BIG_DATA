@@ -1,0 +1,36 @@
+name: CI RapidGo
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Configurar Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Validar sintaxis Python
+        run: python -m compileall producer spark tests
+
+      - name: Validar evento de prueba del contrato
+        run: python -m producer.producer --dry-run --count 5 --rate 1000 --seed 1
+
+      - name: Ejecutar pruebas
+        run: pytest -v
+
+      - name: Validar Docker Compose
+        run: docker compose config --quiet
