@@ -64,3 +64,32 @@ def test_validar_detecta_tipo_incorrecto():
 def test_ejemplos_de_samples_son_json_validos():
     for archivo in Path("samples").glob("*.json"):
         json.loads(archivo.read_text(encoding="utf-8"))
+
+
+def test_ejemplos_de_samples_cumplen_el_contrato():
+    archivos = list(Path("samples").glob("*.json"))
+    assert archivos, "samples/ debe tener al menos un evento de ejemplo"
+    for archivo in archivos:
+        evento = json.loads(archivo.read_text(encoding="utf-8"))
+        assert validar_evento(evento) == [], archivo.name
+
+
+def test_validar_detecta_evento_sin_equipo_o_variante():
+    evento = _eventos(1)[0]
+    del evento["team"]
+    del evento["variant"]
+    problemas = validar_evento(evento)
+    assert any("team" in p for p in problemas)
+    assert any("variant" in p for p in problemas)
+
+
+def test_event_ts_tiene_formato_iso_utc_con_milisegundos():
+    import re
+    patron = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
+    for e in _eventos(50):
+        assert patron.match(e["event_ts"]), e["event_ts"]
+
+
+def test_event_ids_son_unicos():
+    ids = [e["event_id"] for e in _eventos(500)]
+    assert len(set(ids)) == len(ids)

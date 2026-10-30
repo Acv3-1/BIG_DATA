@@ -61,16 +61,18 @@ services:
   spark:
     image: apache/spark:3.5.3-python3
     container_name: rapidgo-spark
+    user: "0"   # root: permite escribir Parquet y checkpoints en ./datalake (volumen montado)
     depends_on:
       kafka-init:
         condition: service_completed_successfully
     environment:
       KAFKA_BOOTSTRAP: kafka:19092
       KAFKA_TOPIC: inventario-fulfillment
+      DATALAKE_PATH: /opt/app/datalake
       PYTHONPATH: /opt/app
     volumes:
       - ./spark:/opt/app/spark:ro
-      - ./datalake:/opt/app/datalake
+      - ./datalake:/opt/app/datalake   # Raw / Processed / Curated + checkpoints
     command:
       - /opt/spark/bin/spark-submit
       - --master

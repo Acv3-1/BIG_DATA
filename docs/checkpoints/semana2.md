@@ -9,7 +9,10 @@
 - 3 transformaciones: limpieza y deduplicación, métricas de pedido (`items_faltantes`, `pedido_incompleto`, `fill_rate`) y métricas operativas (`picking_time_min`, `es_stockout`) (Issue #15).
 - Agregación por ventana de 5 minutos: picking promedio por tienda (Issue #15).
 - 19 pruebas automatizadas en verde (`python -m pytest -v`).
-- [COMPLETAR por el equipo: alertas #16, Parquet con checkpoint #17, ci.yml #19.]
+- 2 reglas de alerta (`STOCK_CRITICO`: stock ≤ 5; `PICKING_FUERA_DE_TIEMPO`: picking > 600 s), con severidad, en `spark/reglas.py` y `spark/alertas.py` (Issue #16).
+- Persistencia en Parquet con checkpoint propio por tabla: Raw → Processed → Curated (picking por tienda y alertas), ver `datalake/README.md` (Issue #17).
+- Pruebas de reglas, contrato del evento y escritura al lake en `tests/` (Issue #18).
+- [COMPLETAR por el equipo: ci.yml #19, y los valores reales de la ejecución con Parquet (#20).]
 
 ## 2. Valor real observado en la ejecución
 

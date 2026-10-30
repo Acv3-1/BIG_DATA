@@ -1,0 +1,13 @@
+{
+  "event_id": "3f2b8c1e-7d4a-4b59-9a62-0c1d5e8f7a10",
+  "team": "equipo-variante10",
+  "variant": 10,
+  "store_id": "S003",
+  "order_id": "PED-482913",
+  "sku": "SKU-0007",
+  "stock": 4,
+  "items_requested": 3,
+  "items_picked": 2,
+  "picking_time_sec": 725,
+  "event_ts": "2026-10-29T15:55:00.123Z"
+}
