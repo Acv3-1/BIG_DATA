@@ -82,3 +82,26 @@ services:
       - --packages
       - org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3
       - /opt/app/spark/streaming_job.py
+
+  # Airflow (Issue #23): un solo contenedor en modo "standalone" (scheduler + API/UI + base SQLite),
+  # suficiente para el proyecto. Interfaz: http://localhost:8080 (ver airflow/README.md).
+  # Ejecución local: puede arrancar solo, no depende de Kafka ni de Spark. El DAG lee ./datalake.
+  airflow:
+    image: apache/airflow:3.3.2-python3.13
+    container_name: rapidgo-airflow
+    command: standalone
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"                   # sin DAGs de ejemplo
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"     # el DAG queda listo para lanzar
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"   # sin pantalla de login (solo local)
+      DATALAKE_PATH: /opt/airflow/datalake
+      REPORTES_PATH: /opt/airflow/reportes                    # dentro del volumen de Airflow (ahí sí puede escribir)
+    volumes:
+      - airflow-home:/opt/airflow                             # base de datos, logs y configuración persisten
+      - ./airflow/dags:/opt/airflow/dags
+      - ./datalake:/opt/airflow/datalake:ro                   # solo lectura: Spark (root) es quien escribe aquí
+
+volumes:
+  airflow-home:
