@@ -84,3 +84,24 @@ def validar_evento(evento: dict) -> list[str]:
         elif not isinstance(evento[campo], tipo):
             problemas.append(f"'{campo}' debe ser {tipo.__name__}")
     return problemas
+
+
+TIPOS_DE_CORRUPCION = ("stock_negativo", "sku_invalido", "campo_nulo")
+
+
+def corromper_evento(rng: random.Random, evento: dict) -> dict:
+    """Devuelve una copia del evento con un defecto de calidad (Issue #25 / #27).
+
+    Sirve para provocar a propósito el fallo de calidad del DAG de Airflow
+    (`python -m producer.producer --malos 0.4`). Nunca toca `store_id`, para que el
+    mensaje siga teniendo una key de Kafka válida.
+    """
+    malo = dict(evento)
+    tipo = rng.choice(TIPOS_DE_CORRUPCION)
+    if tipo == "stock_negativo":
+        malo["stock"] = -rng.randint(1, 50)
+    elif tipo == "sku_invalido":
+        malo["sku"] = rng.choice(["SKU-XYZ", "sku-1", "", "12345"])
+    else:
+        malo[rng.choice(["order_id", "picking_time_sec", "stock"])] = None
+    return malo

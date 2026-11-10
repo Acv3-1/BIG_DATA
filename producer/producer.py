@@ -5,6 +5,8 @@ Ejecutar desde la RAÍZ del repositorio:
     python -m producer.producer                      # envío continuo a Kafka (2 eventos/s)
     python -m producer.producer --count 50 --rate 5  # 50 eventos a 5 por segundo
     python -m producer.producer --dry-run --count 3  # solo imprime los eventos, sin Kafka
+    python -m producer.producer --count 300 --malos 0.4   # 40 % de eventos con datos malos
+                                                          # (para probar la validación de calidad)
 """
 from __future__ import annotations
 
@@ -15,7 +17,8 @@ import random
 import sys
 import time
 
-from producer.eventos import TEAM_POR_DEFECTO, clave_particion, generar_evento
+from producer.eventos import (TEAM_POR_DEFECTO, clave_particion, corromper_evento,
+                              generar_evento)
 
 
 def construir_parser() -> argparse.ArgumentParser:
@@ -28,6 +31,9 @@ def construir_parser() -> argparse.ArgumentParser:
     p.add_argument("--rate", type=float, default=2.0, help="eventos por segundo")
     p.add_argument("--count", type=int, default=0, help="cantidad de eventos (0 = infinito)")
     p.add_argument("--seed", type=int, default=None, help="semilla para resultados reproducibles")
+    p.add_argument("--malos", type=float, default=0.0,
+                   help="fracción (0 a 1) de eventos con datos malos, para probar el fallo de "
+                        "calidad de Airflow (por defecto 0: todos válidos)")
     p.add_argument("--dry-run", action="store_true", help="imprime los eventos sin enviarlos a Kafka")
     return p
 
@@ -45,6 +51,9 @@ def main() -> int:
     if args.rate <= 0:
         print("--rate debe ser mayor que 0", file=sys.stderr)
         return 1
+    if not 0.0 <= args.malos <= 1.0:
+        print("--malos debe estar entre 0 y 1", file=sys.stderr)
+        return 1
 
     rng = random.Random(args.seed)
     productor = None
@@ -61,6 +70,8 @@ def main() -> int:
     try:
         while args.count == 0 or enviados < args.count:
             evento = generar_evento(rng, team=args.team)
+            if args.malos and rng.random() < args.malos:
+                evento = corromper_evento(rng, evento)
             valor = json.dumps(evento, ensure_ascii=False)
             if productor is None:
                 print(valor)
