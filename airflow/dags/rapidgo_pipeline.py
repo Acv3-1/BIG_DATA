@@ -45,8 +45,9 @@ with DAG(
 
     @task
     def validar_calidad(resumen: dict) -> dict:
-        """Falla si Raw o Processed no tienen datos (calidad detallada: Issue #25)."""
-        return t.validar_fuentes(resumen)
+        """Falla si Raw o Processed no tienen datos, o si hay demasiados eventos inválidos
+        en Raw (nulos, stock negativo, SKU inválido...). Issue #25."""
+        return t.validar_calidad(resumen)
 
     @task
     def agregar_kpis(resumen: dict, calidad: dict) -> dict:

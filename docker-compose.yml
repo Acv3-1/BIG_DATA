@@ -96,6 +96,7 @@ services:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"                   # sin DAGs de ejemplo
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"     # el DAG queda listo para lanzar
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"   # sin pantalla de login (solo local)
+      _PIP_ADDITIONAL_REQUIREMENTS: "pyarrow"                 # validar_calidad lee Parquet (Issue #25); se instala al arrancar
       DATALAKE_PATH: /opt/airflow/datalake
       REPORTES_PATH: /opt/airflow/reportes                    # dentro del volumen de Airflow (ahí sí puede escribir)
     volumes:

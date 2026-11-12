@@ -6,7 +6,8 @@ pytest sin instalar Airflow (ver tests/test_airflow_tareas.py), y el archivo del
 
 Reparto del trabajo en estas funciones (para que el equipo no pise el trabajo de otros):
 
-    listar_fuentes / validar_fuentes  -> base (Issue #23). Calidad de datos: Issue #25 (C)
+    listar_fuentes / validar_fuentes  -> base (Issue #23)
+    validar_calidad                   -> calidad de los datos de Raw (Issue #25, C)
     agregar_kpis                      -> placeholder; la agregación real es del Issue #26 (B)
     generar_reporte                   -> base (Issue #23); el contenido crece con #26
 
@@ -21,6 +22,8 @@ import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
+
+import rapidgo_calidad as calidad_datos
 
 RAW_EVENTOS = "raw/eventos"
 PROCESSED_DETALLE = "processed/detalle"
@@ -37,6 +40,10 @@ REQUERIDAS = [RAW_EVENTOS, PROCESSED_DETALLE]
 
 class FuenteNoDisponible(Exception):
     """Una fuente requerida del Data Lake no existe o no tiene datos."""
+
+
+class CalidadInsuficiente(Exception):
+    """Demasiados eventos inválidos en Raw (ver rapidgo_calidad.py)."""
 
 
 def ruta_datalake() -> str:
@@ -91,13 +98,53 @@ def validar_fuentes(resumen: dict) -> dict:
 
     Falla con FuenteNoDisponible y un mensaje que dice QUÉ tabla falta; ese mensaje es el
     que aparece en el log de la task. Un reintento tiene sentido: los datos pueden estar
-    llegando. Pendiente (Issue #25, C): nulos, stock negativo y SKU inválido sobre los datos.
+    llegando. La calidad de los datos en sí (nulos, stock negativo, SKU inválido) la
+    comprueba `validar_calidad`.
     """
     resultado = evaluar_fuentes(resumen)
     if not resultado["ok"]:
         raise FuenteNoDisponible(
             "Fuentes requeridas sin datos: " + "; ".join(resultado["problemas"])
         )
+    return resultado
+
+
+def leer_raw_recientes(base: str | None = None, n: int | None = None) -> list:
+    """Lee los `n` mensajes más recientes de Raw (el JSON tal cual llegó de Kafka).
+
+    Requiere pyarrow en el entorno de Airflow (docker-compose.yml lo instala al arrancar).
+    """
+    try:
+        import pyarrow.dataset as ds
+    except ImportError as error:
+        raise RuntimeError(
+            "Falta pyarrow en el entorno de Airflow: añade _PIP_ADDITIONAL_REQUIREMENTS=pyarrow "
+            "al servicio airflow de docker-compose.yml y reinícialo"
+        ) from error
+    ruta = Path(base or ruta_datalake()) / RAW_EVENTOS
+    tabla = ds.dataset(str(ruta), format="parquet", partitioning="hive").to_table(
+        columns=["value", "kafka_timestamp"])
+    return calidad_datos.seleccionar_recientes(
+        tabla.to_pylist(), n or calidad_datos.eventos_calidad())
+
+
+def validar_calidad(resumen: dict, base: str | None = None) -> dict:
+    """Task 2 (Issue #25): valida las fuentes Y la calidad de los datos de Raw.
+
+    1. Las fuentes requeridas deben tener datos (si no: FuenteNoDisponible).
+    2. Los eventos recientes de Raw deben cumplir las reglas de rapidgo_calidad.py
+       (nulos, stock negativo, SKU inválido...). Si la proporción de inválidos supera el
+       umbral: CalidadInsuficiente, con el desglose por motivo en el mensaje.
+
+    Devuelve el resultado de las fuentes más la clave `datos` con las métricas de calidad
+    (viaja por XCom y queda en el reporte).
+    """
+    resultado = validar_fuentes(resumen)
+    calidad = calidad_datos.evaluar_calidad(leer_raw_recientes(base))
+    resultado = {**resultado, "datos": calidad}
+    if not calidad["ok"]:
+        raise CalidadInsuficiente("Calidad insuficiente en raw/eventos: "
+                                  + calidad_datos.describir(calidad))
     return resultado
 
 
