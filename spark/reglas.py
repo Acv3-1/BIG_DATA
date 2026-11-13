@@ -31,9 +31,17 @@ def _entero_de_entorno(nombre: str, defecto: int) -> int:
     return int(valor) if valor not in (None, "") else defecto
 
 
-# Umbrales iniciales. El producer genera stock crítico en 0-5 y picking lento en 600-1200 s.
+# Umbrales finales (calibración de la Semana 4, ver docs/decisions/ADR-004-umbrales-finales.md).
+# El producer genera stock crítico en 0-5 y picking lento en 600-1200 s; los umbrales 5 y 600
+# caen justo en el borde de esos grupos (~8 % de alertas de picking y ~12 % de stock,
+# frente al 8 % y 12 % que el producer inyecta). Reproducible: scripts/calibrar_umbrales.py
 UMBRAL_STOCK_CRITICO = _entero_de_entorno("UMBRAL_STOCK_CRITICO", 5)
 UMBRAL_PICKING_SEC = _entero_de_entorno("UMBRAL_PICKING_SEC", 600)
+
+# Severidad "alta" del picking: más de FACTOR_SEVERIDAD_PICKING veces el umbral. Con el factor
+# inicial (2.0 -> más de 1200 s) la severidad alta no se activaba nunca: el producer no pasa de
+# 1200 s. Con 1.5 (> 900 s) se activa en ~4 % de los eventos.
+FACTOR_SEVERIDAD_PICKING = 1.5
 
 
 def es_stock_critico(stock: int, umbral: int = UMBRAL_STOCK_CRITICO) -> bool:
@@ -52,8 +60,9 @@ def severidad_stock(stock: int) -> str:
 
 
 def severidad_picking(picking_time_sec: int, umbral: int = UMBRAL_PICKING_SEC) -> str:
-    """Más del doble del umbral es grave; entre 1x y 2x es moderado."""
-    return SEVERIDAD_ALTA if picking_time_sec > 2 * umbral else SEVERIDAD_MEDIA
+    """Más de 1.5 veces el umbral es grave; entre 1x y 1.5x es moderado."""
+    return (SEVERIDAD_ALTA if picking_time_sec > FACTOR_SEVERIDAD_PICKING * umbral
+            else SEVERIDAD_MEDIA)
 
 
 def evaluar_alertas(evento: dict, umbral_stock: int = UMBRAL_STOCK_CRITICO,

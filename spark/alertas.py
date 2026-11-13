@@ -9,8 +9,9 @@ from __future__ import annotations
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
-from spark.reglas import (PICKING_FUERA_DE_TIEMPO, SEVERIDAD_ALTA, SEVERIDAD_MEDIA,
-                          STOCK_CRITICO, UMBRAL_PICKING_SEC, UMBRAL_STOCK_CRITICO)
+from spark.reglas import (FACTOR_SEVERIDAD_PICKING, PICKING_FUERA_DE_TIEMPO, SEVERIDAD_ALTA,
+                          SEVERIDAD_MEDIA, STOCK_CRITICO, UMBRAL_PICKING_SEC,
+                          UMBRAL_STOCK_CRITICO)
 
 COLUMNAS_ALERTA = [
     "event_id", "event_time", "store_id", "order_id", "sku",
@@ -52,7 +53,7 @@ def detectar_alertas(df: DataFrame,
         df,
         F.col("picking_time_sec") > umbral_picking,
         PICKING_FUERA_DE_TIEMPO,
-        F.when(F.col("picking_time_sec") > 2 * umbral_picking, SEVERIDAD_ALTA)
+        F.when(F.col("picking_time_sec") > FACTOR_SEVERIDAD_PICKING * umbral_picking, SEVERIDAD_ALTA)
          .otherwise(SEVERIDAD_MEDIA),
         F.col("picking_time_sec"),
         umbral_picking,
