@@ -55,8 +55,9 @@ def test_severidad_de_stock():
 
 def test_severidad_de_picking():
     assert severidad_picking(700, umbral=600) == "media"
-    assert severidad_picking(1200, umbral=600) == "media"    # justo el doble: aún media
-    assert severidad_picking(1201, umbral=600) == "alta"
+    assert severidad_picking(900, umbral=600) == "media"     # justo 1.5x el umbral: aún media
+    assert severidad_picking(901, umbral=600) == "alta"
+    assert severidad_picking(1200, umbral=600) == "alta"     # el máximo que genera el producer
 
 
 # ------------------------------------------------------------------ evaluar_alertas

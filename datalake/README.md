@@ -24,7 +24,7 @@ datalake/
 | `STOCK_CRITICO` | `stock <= umbral` | 5 unidades | `UMBRAL_STOCK_CRITICO` |
 | `PICKING_FUERA_DE_TIEMPO` | `picking_time_sec > umbral` | 600 s (10 min) | `UMBRAL_PICKING_SEC` |
 
-Severidad: `alta` si el stock es 0 o el picking supera el doble del umbral; `media` en los demás casos.
+Severidad: `alta` si el stock es 0 o el picking supera 1.5 veces el umbral (más de 900 s); `media` en los demás casos.
 Las reglas están en `spark/reglas.py` (Python puro) y se aplican a DataFrames en `spark/alertas.py`.
 Los umbrales son **iniciales**: se ajustan en la calibración (Issue #20) tras observar valores reales.
 

@@ -92,6 +92,8 @@ def test_alertas_por_tipo_y_severidad(spark):
         _evento(event_id="c", picking_time_sec=700),                 # lento -> media
         _evento(event_id="d", picking_time_sec=1300),                # muy lento -> alta
         _evento(event_id="e", stock=6, picking_time_sec=600),        # en el límite: sin alerta
+        _evento(event_id="f", picking_time_sec=900),                 # 1.5x el umbral: aún media
+        _evento(event_id="g", picking_time_sec=901),                 # justo por encima: alta
     ]
     filas = detectar_alertas(_detalle(spark, eventos), 5, 600).collect()
     obtenido = {(r["event_id"], r["tipo_alerta"]): (r["severidad"], r["valor"], r["umbral"])
@@ -101,6 +103,8 @@ def test_alertas_por_tipo_y_severidad(spark):
         ("b", STOCK_CRITICO): ("media", 3, 5),
         ("c", PICKING_FUERA_DE_TIEMPO): ("media", 700, 600),
         ("d", PICKING_FUERA_DE_TIEMPO): ("alta", 1300, 600),
+        ("f", PICKING_FUERA_DE_TIEMPO): ("media", 900, 600),
+        ("g", PICKING_FUERA_DE_TIEMPO): ("alta", 901, 600),
     }
 
 
