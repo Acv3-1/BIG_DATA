@@ -1,0 +1,58 @@
+name: Release RapidGo
+
+# Se ejecuta al subir un tag con formato vX.Y.Z (por ejemplo, v1.0.0).
+# Quality gate: si el CI falla, no se publica el release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  publicar:
+    needs: ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Validar formato del tag
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?$ ]]; then
+            echo "::error::El tag '$GITHUB_REF_NAME' no sigue el formato vX.Y.Z"
+            exit 1
+          fi
+
+      - name: Validar contenido mínimo del README
+        run: |
+          for palabra in kafka airflow docker video contribu; do
+            grep -qi "$palabra" README.md || { echo "::error::El README no menciona '$palabra'"; exit 1; }
+          done
+
+      - name: Empaquetar el proyecto
+        run: git archive --format=zip --prefix="rapidgo-${GITHUB_REF_NAME}/" -o "rapidgo-${GITHUB_REF_NAME}.zip" HEAD
+
+      - name: Guardar artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapidgo-${{ github.ref_name }}
+          path: rapidgo-${{ github.ref_name }}.zip
+
+      - name: Crear GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          zip="rapidgo-${GITHUB_REF_NAME}.zip"
+          notas="docs/release-notes/${GITHUB_REF_NAME}.md"
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "El release ya existe; solo se adjunta el artefacto."
+            gh release upload "$GITHUB_REF_NAME" "$zip" --clobber
+          elif [ -f "$notas" ]; then
+            gh release create "$GITHUB_REF_NAME" "$zip" --title "$GITHUB_REF_NAME" --notes-file "$notas" --verify-tag
+          else
+            gh release create "$GITHUB_REF_NAME" "$zip" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+          fi

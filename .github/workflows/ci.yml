@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+  workflow_call:          # permite que release.yml reutilice este CI como quality gate
 
 jobs:
   validar:
@@ -24,54 +25,37 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Validar sintaxis Python
-        run: python -m compileall producer spark airflow tests
+        run: python -m compileall producer spark tests airflow scripts
+
+      - name: Validar DAG de Airflow (estático)
+        run: python scripts/validar_dag.py
 
       - name: Validar evento de prueba del contrato
         run: python -m producer.producer --dry-run --count 5 --rate 1000 --seed 1
 
-      - name: Pruebas de reglas de negocio (alertas y tareas del DAG)
-        run: pytest -v tests/test_reglas_alerta.py tests/test_airflow_tareas.py tests/test_dag_estructura.py
-
-      - name: Ejecutar todas las pruebas
+      - name: Ejecutar pruebas
         run: pytest -v
 
       - name: Validar Docker Compose
         run: docker compose config --quiet
 
-  # Semana 3: se instala Airflow de verdad (con las constraints oficiales de su versión) para
-  # importar el DAG y comprobar su estructura. Va en un job aparte: tarda más y así el CI
-  # básico sigue siendo rápido y se ve por separado si falla el DAG.
-  validar-dag:
-    name: validar-dag (Airflow)
+  estructura:
+    # Quality gate de documentación: los entregables que pide la guía deben existir.
+    needs: validar
     runs-on: ubuntu-latest
-    env:
-      AIRFLOW_VERSION: "3.3.2"      # misma versión que la imagen de docker-compose.yml
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Configurar Python
-        uses: actions/setup-python@v7
-        with:
-          python-version: '3.13'
-          cache: 'pip'
-
-      - name: Instalar Airflow y pytest
+      - name: Verificar archivos obligatorios
         run: |
-          PYTHON_VERSION="$(python -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
-          pip install "apache-airflow==${AIRFLOW_VERSION}" pytest \
-            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
-          python -c "import airflow.sdk, airflow; print('Airflow', airflow.__version__)"
-
-      - name: Importar el DAG (sin errores de importación)
-        run: |
-          python -c "
-          import sys
-          sys.path.insert(0, 'airflow/dags')
-          import rapidgo_pipeline as m
-          print('DAG:', m.dag.dag_id)
-          print('Tasks:', sorted(m.dag.task_dict))
-          "
-
-      - name: Pruebas de estructura del DAG (tasks, dependencias y retries)
-        run: pytest -v -rs tests/test_dag_rapidgo.py
+          faltan=0
+          for f in README.md docker-compose.yml requirements.txt docs/arquitectura.png \
+                   docs/checkpoints/semana1.md docs/checkpoints/semana2.md docs/checkpoints/semana3.md; do
+            [ -f "$f" ] || { echo "::error::Falta $f"; faltan=1; }
+          done
+          for n in 001 002 003; do
+            ls docs/decisions/ADR-$n-*.md > /dev/null 2>&1 || { echo "::error::Falta docs/decisions/ADR-$n-*.md"; faltan=1; }
+          done
+          ls samples/*.json > /dev/null 2>&1 || { echo "::error::Falta un ejemplo de evento en samples/"; faltan=1; }
+          exit $faltan
